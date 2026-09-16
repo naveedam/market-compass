@@ -62,9 +62,9 @@ export default function StockScreener({ shariahOnly = false }: Props) {
     };
   };
 
-  const shariahTooltip = (r: ShariahResult) => {
-    if (!r.dataAvailable) {
-      return `Data unavailable — ${r.failedRules[0] ?? "could not fetch financials"}`;
+    const shariahTooltip = (r: ShariahResult) => {
+    if (!r.ratiosComputed) {
+      return r.failedRules[0] ?? (r.dataAvailable ? "Excluded" : "Data unavailable");
     }
 
     const lines = [
