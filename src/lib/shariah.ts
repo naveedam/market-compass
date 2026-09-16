@@ -1,25 +1,41 @@
 import { fetchFundamentals } from "./yahoo";
 
 // ---------------------------------------------------------------------
-// Educational, ratio-based Shariah screen — 5 rules, all computed from
-// live financial data. Sector is NOT used to decide compliance; Google
-// Sheets still stores Symbol/Name/Sector, but Sector is display-only
-// here. This is a simplified, best-effort implementation built on free
-// Yahoo Finance data — it is NOT a substitute for a certified Shariah
-// board review. Treat results as educational, not a fatwa or
-// investment advice.
+// Educational Shariah screen — two gates:
+//   1. Business activity screen (sector + a small set of known company
+//      overrides) — a hard gate; failing this means excluded regardless
+//      of ratios.
+//   2. Financial ratio screen — 5 rules, computed from live financial
+//      data, for stocks that pass gate 1.
+//
+// This is a simplified, best-effort implementation built on free Yahoo
+// Finance data — it is NOT a substitute for a certified Shariah board
+// review. Treat results as educational, not a fatwa or investment
+// advice.
 //
 // Data-quality caveats (documented, not hidden):
 //   - "Secured + Unsecured Debt" is approximated with Yahoo's single
 //     aggregate totalDebt figure — Yahoo doesn't expose the split
 //     Indian filings show.
-//   - "Interest Income" is often missing/zero in the free Yahoo feed
-//     for non-financial companies, since it's rarely broken out as
-//     its own income-statement line.
 //   - Missing data defaults to 0, which can make a rule look passed
 //     when it's actually just unmeasured. failedRules only reflects
 //     rules that were positively violated with the data available.
+//   - The Sector field from the Sheet is a broad industry label (e.g.
+//     "FMCG") and can't by itself distinguish a company whose core
+//     business includes a non-permissible activity from others sharing
+//     the same label. PROHIBITED_TICKERS below is a narrow, explicit
+//     override for known cases the sector label can't catch — not a
+//     general classification system. Revisit if the universe expands
+//     beyond the current Nifty 50 list.
 // ---------------------------------------------------------------------
+
+const PROHIBITED_SECTORS = ["Banking", "Insurance", "Financial Services"];
+
+// Company-level overrides for primary business activities the Sheet's
+// broad Sector label doesn't capture.
+const PROHIBITED_TICKERS: Record<string, string> = {
+  "ITC.NS": "Primary business includes tobacco/cigarette manufacturing",
+};
 
 const MIN_MARKET_CAP = 300_000_000; // ₹30 Cr, in INR
 const DEBT_TO_EQUITY_THRESHOLD = 0.33;
@@ -34,12 +50,30 @@ export interface ShariahResult {
   // should show a "Data Unavailable" state for these, not "Excluded",
   // since compliant:false here reflects "unknown", not "screened out".
   dataAvailable: boolean;
+  // false when the business-activity gate excluded the stock before
+  // any ratio was computed — the ratio fields below are all 0 and
+  // meaningless in that case, not real measured values.
+  ratiosComputed: boolean;
   marketCap: number;
   debtToEquity: number;
   debtToMarketCap: number;
   interestToSales: number;
   receivablesToMarketCap: number;
   failedRules: string[];
+}
+
+function excludedByBusinessScreen(reason: string): ShariahResult {
+  return {
+    compliant: false,
+    dataAvailable: true, // this is a definitive verdict, not a data gap
+    ratiosComputed: false,
+    marketCap: 0,
+    debtToEquity: 0,
+    debtToMarketCap: 0,
+    interestToSales: 0,
+    receivablesToMarketCap: 0,
+    failedRules: [reason],
+  };
 }
 
 function unavailableResult(reason: string): ShariahResult {
@@ -50,6 +84,7 @@ function unavailableResult(reason: string): ShariahResult {
   return {
     compliant: false,
     dataAvailable: false,
+    ratiosComputed: false,
     marketCap: 0,
     debtToEquity: 0,
     debtToMarketCap: 0,
@@ -60,12 +95,24 @@ function unavailableResult(reason: string): ShariahResult {
 }
 
 /**
- * Runs the 5-rule financial-ratio Shariah screen for a single stock.
- * Purely quantitative — sector plays no role in the decision.
+ * Runs the full Shariah screen for a single stock: business-activity
+ * gate first (sector + known overrides), then the 5-rule ratio screen
+ * for whatever passes it.
  */
 export async function screenShariahCompliance(
-  ticker: string
+  ticker: string,
+  sector: string
 ): Promise<ShariahResult> {
+  if (PROHIBITED_SECTORS.includes(sector)) {
+    return excludedByBusinessScreen(
+      `Sector "${sector}" is not a permissible business activity`
+    );
+  }
+
+  if (ticker in PROHIBITED_TICKERS) {
+    return excludedByBusinessScreen(PROHIBITED_TICKERS[ticker]);
+  }
+
   let f;
   try {
     f = await fetchFundamentals(ticker);
@@ -118,6 +165,7 @@ export async function screenShariahCompliance(
   return {
     compliant: failedRules.length === 0,
     dataAvailable: true,
+    ratiosComputed: true,
     marketCap: f.marketCap,
     debtToEquity: f.debtToEquity,
     debtToMarketCap,
