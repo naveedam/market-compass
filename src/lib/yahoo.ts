@@ -55,11 +55,18 @@ function extractTimeseriesValue(timeseries: any, candidateKeys: string[]): numbe
   for (const key of candidateKeys) {
     for (const entry of results) {
       const series = entry?.[key];
-      if (!Array.isArray(series)) continue;
+      if (!Array.isArray(series) || series.length === 0) continue;
+
+      // Yahoo returns these oldest-first — pick the most recent point
+      // by asOfDate rather than assuming array order.
+      let best: { raw: number; date: number } | null = null;
       for (const point of series) {
         const raw = point?.reportedValue?.raw ?? point?.raw;
-        if (typeof raw === "number") return raw;
+        if (typeof raw !== "number") continue;
+        const date = point?.asOfDate ? new Date(point.asOfDate).getTime() : 0;
+        if (!best || date > best.date) best = { raw, date };
       }
+      if (best) return best.raw;
     }
   }
   return 0;
@@ -84,13 +91,13 @@ export async function fetchFundamentals(symbol: string): Promise<Fundamentals> {
     totalDebt: fin.totalDebt?.raw ?? 0,
     totalRevenue: fin.totalRevenue?.raw ?? 0,
     interestIncome: extractTimeseriesValue(json.timeseries, [
-      "annualInterestIncome",
-      "annualInterestExpense",
+      "annualInterestIncome", // confirmed working
+      "annualInterestExpense", // fallback only — different metric, not a true substitute
     ]),
     netReceivables: extractTimeseriesValue(json.timeseries, [
-      "annualNetReceivables",
-      "annualAccountsReceivable",
-      "annualReceivables",
+      "annualAccountsReceivable", // confirmed working — the correct field name
+      "annualNetReceivables", // kept as a harmless fallback; not returned by Yahoo in testing
+      "annualReceivables", // same
     ]),
   };
 }
