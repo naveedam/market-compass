@@ -83,9 +83,9 @@ export async function screenUniverse(
 
   for (const stock of universe) {
     try {
-      const [daily, shariah] = await Promise.all([
+            const [daily, shariah] = await Promise.all([
         fetchHistory(stock.ticker),
-        screenShariahCompliance(stock.ticker),
+        screenShariahCompliance(stock.ticker, stock.sector),
       ]);
 
       if (daily.length < 252) continue;
