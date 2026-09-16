@@ -48,6 +48,23 @@ export interface Fundamentals {
   netReceivables: number;
 }
 
+function extractTimeseriesValue(timeseries: any, candidateKeys: string[]): number {
+  const results = timeseries?.timeseries?.result;
+  if (!Array.isArray(results)) return 0;
+
+  for (const key of candidateKeys) {
+    for (const entry of results) {
+      const series = entry?.[key];
+      if (!Array.isArray(series)) continue;
+      for (const point of series) {
+        const raw = point?.reportedValue?.raw ?? point?.raw;
+        if (typeof raw === "number") return raw;
+      }
+    }
+  }
+  return 0;
+}
+
 export async function fetchFundamentals(symbol: string): Promise<Fundamentals> {
   const res = await fetch(`/api/fundamentals?symbol=${encodeURIComponent(symbol)}`);
 
@@ -60,17 +77,20 @@ export async function fetchFundamentals(symbol: string): Promise<Fundamentals> {
 
   const price = result.price ?? {};
   const fin = result.financialData ?? {};
-  const incomeHistory =
-    result.incomeStatementHistory?.incomeStatementHistory?.[0] ?? {};
-  const balanceSheet =
-    result.balanceSheetHistory?.balanceSheetStatements?.[0] ?? {};
 
   return {
     marketCap: price.marketCap?.raw ?? 0,
     debtToEquity: (fin.debtToEquity?.raw ?? 0) / 100,
     totalDebt: fin.totalDebt?.raw ?? 0,
     totalRevenue: fin.totalRevenue?.raw ?? 0,
-    interestIncome: incomeHistory.interestIncome?.raw ?? 0,
-    netReceivables: balanceSheet.netReceivables?.raw ?? 0,
+    interestIncome: extractTimeseriesValue(json.timeseries, [
+      "annualInterestIncome",
+      "annualInterestExpense",
+    ]),
+    netReceivables: extractTimeseriesValue(json.timeseries, [
+      "annualNetReceivables",
+      "annualAccountsReceivable",
+      "annualReceivables",
+    ]),
   };
 }
