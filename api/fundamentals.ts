@@ -97,6 +97,39 @@ async function fetchQuoteSummary(symbol: string) {
   return { status: res.status, ok: res.ok, rawBody };
 }
 
+async function fetchTimeseries(symbol: string, auth: YahooAuth) {
+  // The quoteSummary balanceSheetHistory/incomeStatementHistory modules
+  // return no real line items for receivables or interest income on
+  // this symbol (confirmed empirically) — Yahoo's own site now sources
+  // that detail from this separate timeseries endpoint instead. Field
+  // names here aren't fully confirmed, so several plausible candidates
+  // are requested together; unknown keys are silently dropped by Yahoo
+  // rather than causing an error, so this is safe to over-request.
+  const candidateKeys = [
+    "annualNetReceivables",
+    "annualAccountsReceivable",
+    "annualReceivables",
+    "annualInterestIncome",
+    "annualInterestExpense",
+  ];
+  const url =
+    `https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(symbol)}` +
+    `?symbol=${encodeURIComponent(symbol)}&type=${candidateKeys.join(",")}` +
+    `&period1=1420070400&period2=${Math.floor(Date.now() / 1000)}` +
+    `&crumb=${encodeURIComponent(auth.crumb)}`;
+
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0",
+      Accept: "application/json",
+      Cookie: auth.cookie,
+    },
+  });
+
+  const rawBody = await res.text();
+  return { ok: res.ok, rawBody };
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const symbol = req.query.symbol;
@@ -159,8 +192,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
+    let timeseries: unknown = null;
+    try {
+      const auth = await getYahooAuth();
+      const ts = await fetchTimeseries(symbol, auth);
+      if (ts.ok) timeseries = JSON.parse(ts.rawBody);
+    } catch {
+      // Best-effort only — staying null just means the caller falls
+      // back to its existing 0 default for receivables/interest income.
+    }
+
     res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=300");
-    res.status(200).json(data);
+    res.status(200).json({ ...data, timeseries });
   } catch (err) {
     console.error("[api/fundamentals] unexpected error:", err);
     res.status(500).json({
