@@ -3,7 +3,7 @@ import type { NSESymbol } from "./search/symbolSearch";
 // Same Apps Script Web App that already serves reads for the Watchlist
 // sheet (see sheets.ts) — this just adds a write via doPost.
 const WATCHLIST_URL =
-  "https://script.google.com/macros/s/AKfycbz7Xf29mRvH30K8N2_G6T5mkdZPNQ1UtDDZw8CbJFzn2liEEnqjcZzUua_Um5DPxVTN/exec";
+  "https://script.google.com/macros/s/AKfycbxeNBCliwCOCOi0BzTE2H1HCNaGmgkssrrACDQLd-NGF1symVO7cIqw5rXpwAf0wdhs/exec";
 
 // Basic deterrent against casual/accidental spam — NOT real security.
 // Must match WRITE_SECRET in the Apps Script exactly. See that file's
