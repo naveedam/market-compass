@@ -5,7 +5,7 @@ export type UniverseRow = {
 };
 
 const SHEET_URL =
-  "https://script.google.com/macros/s/AKfycbz7Xf29mRvH30K8N2_G6T5mkdZPNQ1UtDDZw8CbJFzn2liEEnqjcZzUua_Um5DPxVTN/exec";
+  "https://script.google.com/macros/s/AKfycbxeNBCliwCOCOi0BzTE2H1HCNaGmgkssrrACDQLd-NGF1symVO7cIqw5rXpwAf0wdhs/exec";
 
 export async function loadUniverse(): Promise<UniverseRow[]> {
   const res = await fetch(SHEET_URL);

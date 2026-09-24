@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "RELIANCE",
+    "ticker": "RELIANCE.NS",
+    "name": "Reliance Industries Ltd",
+    "sector": "Energy"
+  },
+  {
+    "symbol": "TATAMOTORS",
+    "ticker": "TATAMOTORS.NS",
+    "name": "Tata Motors Ltd",
+    "sector": "Auto"
+  },
+  {
+    "symbol": "TCS",
+    "ticker": "TCS.NS",
+    "name": "Tata Consultancy Services Ltd",
+    "sector": "IT"
+  },
+  {
+    "symbol": "IRFC",
+    "ticker": "IRFC.NS",
+    "name": "Indian Railway Finance Corporation Ltd",
+    "sector": "Financial Services"
+  }
+]
