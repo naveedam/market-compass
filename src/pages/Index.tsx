@@ -1,8 +1,11 @@
 import { useState } from "react";
 import StockScreener from "@/components/StockScreener";
+import AddStockPanel from "@/components/search/AddStockPanel";
 
 export default function Index() {
   const [shariahOnly, setShariahOnly] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
   return (
     <main className="min-h-screen bg-[#030B1A] text-white">
       <div className="mx-auto max-w-7xl p-8">
@@ -30,7 +33,9 @@ export default function Index() {
           </p>
         </div>
 
-        <StockScreener shariahOnly={shariahOnly} />
+        <AddStockPanel onAdded={() => setRefreshKey(k => k + 1)} />
+
+        <StockScreener key={refreshKey} shariahOnly={shariahOnly} />
 
         <div className="mt-10 rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
           <h2 className="text-2xl font-semibold mb-5">
