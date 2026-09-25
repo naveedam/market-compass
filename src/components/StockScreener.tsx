@@ -3,9 +3,38 @@ import { Link } from "react-router-dom";
 import { loadUniverse } from "@/lib/sheets";
 import { screenUniverse, type StockSignal } from "@/lib/marketEngine";
 import type { ShariahResult } from "@/lib/shariah";
+import type { SwingSignal } from "@/lib/swingSignals";
 
 interface Props {
   shariahOnly?: boolean;
+}
+
+function DirectionBadge({ direction }: { direction: SwingSignal["direction"] }) {
+  const styles = {
+    BUY: "bg-profit/20 text-profit",
+    SELL: "bg-loss/20 text-loss",
+    HOLD: "bg-muted text-muted-foreground",
+  } as const;
+
+  const symbol = { BUY: "▲", SELL: "▼", HOLD: "—" } as const;
+
+  return (
+    <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-black uppercase tracking-wider ${styles[direction]}`}>
+      {symbol[direction]} {direction}
+    </span>
+  );
+}
+
+function swingTooltip(s: SwingSignal): string {
+  return [
+    `Entry: ₹${s.entry.toFixed(2)}`,
+    `Stop-loss: ₹${s.stopLoss.toFixed(2)}`,
+    `Target: ₹${s.target.toFixed(2)}`,
+    `Risk:Reward: 1:${s.riskReward}`,
+    `Support: ₹${s.support.toFixed(2)}  |  Resistance: ₹${s.resistance.toFixed(2)}`,
+    "",
+    s.reason,
+  ].join("\n");
 }
 
 export default function StockScreener({ shariahOnly = false }: Props) {
@@ -22,47 +51,31 @@ export default function StockScreener({ shariahOnly = false }: Props) {
   }, []);
 
   if (loading)
-    return <div className="p-8 text-slate-400">Scanning NSE universe...</div>;
-
-  const score = (s: StockSignal) => {
-    let x = 0;
-    if (s.rsiDaily > 60) x += 25;
-    else if (s.rsiDaily > 50) x += 15;
-
-    if (s.macdDaily) x += 25;
-
-    if (s.high52Distance > 95) x += 25;
-    else if (s.high52Distance > 85) x += 15;
-
-    if (s.adx) x += 5;
-    if (s.supertrend) x += 5;
-
-    return Math.min(100, x);
-  };
+    return <div className="p-8 text-muted-foreground">Scanning NSE universe...</div>;
 
   const status = (v: number) => {
     if (v >= 70)
       return {
         label: "High Alignment",
-        cls: "bg-emerald-600 text-white",
+        cls: "bg-profit/20 text-profit",
         tip: "Daily, weekly and monthly momentum are strongly aligned. Educational observation only."
       };
 
     if (v >= 40)
       return {
         label: "Building",
-        cls: "bg-amber-500 text-black",
+        cls: "bg-warning/20 text-warning",
         tip: "Multiple technical characteristics are improving, but the overall structure is still developing."
       };
 
     return {
       label: "Developing",
-      cls: "text-slate-400",
+      cls: "text-muted-foreground",
       tip: "Early stage market structure. The trend and momentum are still forming."
     };
   };
 
-    const shariahTooltip = (r: ShariahResult) => {
+  const shariahTooltip = (r: ShariahResult) => {
     if (!r.ratiosComputed) {
       return r.failedRules[0] ?? (r.dataAvailable ? "Excluded" : "Data unavailable");
     }
@@ -82,38 +95,38 @@ export default function StockScreener({ shariahOnly = false }: Props) {
 
   const visibleStocks = stocks.filter(s => !shariahOnly || s.shariah.compliant);
 
-  const aligned = visibleStocks.filter(s => score(s) >= 70).length;
+  const aligned = visibleStocks.filter(s => s.score >= 70).length;
 
   return (
     <div className="space-y-6">
 
       <div className="grid grid-cols-3 gap-4">
 
-        <div className="bg-slate-900 rounded-xl p-5">
-          <p className="text-slate-400 text-sm">Universe</p>
-          <h2 className="text-3xl font-bold">{visibleStocks.length}</h2>
+        <div className="panel p-5">
+          <p className="text-muted-foreground text-sm">Universe</p>
+          <h2 className="text-3xl font-bold ticker-value">{visibleStocks.length}</h2>
         </div>
 
-        <div className="bg-emerald-950 rounded-xl p-5">
-          <p className="text-emerald-300 text-sm">High Alignment</p>
-          <h2 className="text-3xl font-bold">{aligned}</h2>
+        <div className="panel p-5 bg-profit/10 border-profit/30">
+          <p className="text-profit text-sm">High Alignment</p>
+          <h2 className="text-3xl font-bold ticker-value terminal-glow">{aligned}</h2>
         </div>
 
-        <div className="bg-slate-900 rounded-xl p-5">
-          <p className="text-slate-400 text-sm">Last Updated</p>
-          <h2 className="text-lg font-semibold">
+        <div className="panel p-5">
+          <p className="text-muted-foreground text-sm">Last Updated</p>
+          <h2 className="text-lg font-semibold ticker-value">
             {new Date().toLocaleTimeString()}
           </h2>
         </div>
 
       </div>
 
-      <div className="bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
+      <div className="panel overflow-hidden">
 
         <table className="w-full">
 
-          <thead className="bg-slate-900">
-            <tr className="text-left text-slate-400 text-sm">
+          <thead className="bg-secondary">
+            <tr className="text-left text-muted-foreground text-xs uppercase tracking-wider">
 
               <th className="p-3">Company</th>
 
@@ -139,30 +152,33 @@ export default function StockScreener({ shariahOnly = false }: Props) {
                 Shariah ⓘ
               </th>
 
+              <th title="Educational swing-trade read derived from the same score: direction, entry, stop-loss, target and support/resistance. Hover for the breakdown.">
+                Signal ⓘ
+              </th>
+
             </tr>
           </thead>
 
           <tbody>
 
             {visibleStocks.map(s => {
-              const sc = score(s);
-              const st = status(sc);
+              const st = status(s.score);
 
               return (
                 <tr
                   key={s.ticker}
-                  className="border-t border-slate-800 hover:bg-slate-900/60"
+                  className="border-t border-border hover:bg-secondary/60"
                 >
 
                   <td className="p-3">
                     <Link
                       to={`/stock/${encodeURIComponent(s.ticker)}`}
-                      className="font-semibold text-sky-400 hover:text-sky-300"
+                      className="font-semibold text-signal hover:brightness-125"
                     >
                       {s.name}
                     </Link>
 
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-muted-foreground font-mono">
                       {s.ticker}
                     </div>
                   </td>
@@ -170,23 +186,23 @@ export default function StockScreener({ shariahOnly = false }: Props) {
                   <td>
                     <div className="flex items-center gap-2">
 
-                      <div className="w-20 h-2 bg-slate-700 rounded-full overflow-hidden">
+                      <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-sky-400"
-                          style={{ width: `${sc}%` }}
+                          className="h-full bg-signal"
+                          style={{ width: `${s.score}%` }}
                         />
                       </div>
 
-                      <span className="font-semibold w-8">{sc}</span>
+                      <span className="font-semibold w-8 ticker-value">{s.score}</span>
 
                     </div>
                   </td>
 
-                  <td>₹{s.price.toFixed(2)}</td>
+                  <td className="ticker-value">₹{s.price.toFixed(2)}</td>
 
-                  <td>{s.high52Distance.toFixed(1)}%</td>
+                  <td className="ticker-value">{s.high52Distance.toFixed(1)}%</td>
 
-                  <td>{s.rsiDaily.toFixed(1)}</td>
+                  <td className="ticker-value">{s.rsiDaily.toFixed(1)}</td>
 
                   <td>
                     <span
@@ -202,10 +218,10 @@ export default function StockScreener({ shariahOnly = false }: Props) {
                       title={shariahTooltip(s.shariah)}
                       className={`px-2 py-1 rounded text-xs font-semibold cursor-help ${
                         !s.shariah.dataAvailable
-                          ? "bg-amber-950 text-amber-300"
+                          ? "bg-warning/20 text-warning"
                           : s.shariah.compliant
-                          ? "bg-emerald-950 text-emerald-300"
-                          : "bg-slate-800 text-slate-400"
+                          ? "bg-profit/20 text-profit"
+                          : "bg-muted text-muted-foreground"
                       }`}
                     >
                       {!s.shariah.dataAvailable
@@ -213,6 +229,12 @@ export default function StockScreener({ shariahOnly = false }: Props) {
                         : s.shariah.compliant
                         ? "Compliant"
                         : "Excluded"}
+                    </span>
+                  </td>
+
+                  <td>
+                    <span title={swingTooltip(s.swing)} className="cursor-help">
+                      <DirectionBadge direction={s.swing.direction} />
                     </span>
                   </td>
 
@@ -226,9 +248,9 @@ export default function StockScreener({ shariahOnly = false }: Props) {
 
       </div>
 
-      <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
-        <p className="text-xs text-slate-400 leading-6">
-          <span className="font-semibold text-slate-300">
+      <div className="panel p-4">
+        <p className="text-xs text-muted-foreground leading-6">
+          <span className="font-semibold text-foreground">
             Educational Use Only.
           </span>{" "}
           MarketCompass is designed to help users learn technical market analysis.

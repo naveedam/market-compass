@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { fetchHistory } from "@/lib/yahoo";
+import { rsi, macd, computeScore } from "@/lib/marketEngine";
+import { computeSwingSignal, type SwingSignal } from "@/lib/swingSignals";
 
 type Candle = {
   date:string;
@@ -10,6 +12,22 @@ type Candle = {
   close:number;
   volume:number;
 };
+
+function DirectionBadge({ direction }: { direction: SwingSignal["direction"] }) {
+  const styles = {
+    BUY: "bg-profit/20 text-profit border-profit/40",
+    SELL: "bg-loss/20 text-loss border-loss/40",
+    HOLD: "bg-muted text-muted-foreground border-border",
+  } as const;
+
+  const symbol = { BUY: "▲", SELL: "▼", HOLD: "—" } as const;
+
+  return (
+    <span className={`text-sm px-3 py-1.5 rounded-lg font-mono font-black uppercase tracking-wider border ${styles[direction]}`}>
+      {symbol[direction]} {direction}
+    </span>
+  );
+}
 
 export default function StockDetail(){
   const { ticker="" } = useParams();
@@ -77,57 +95,113 @@ export default function StockDetail(){
 
   const trend=current>=data[0]?.close;
 
+  const signal = useMemo(() => {
+    if (rows.length < 252) return null;
+
+    const closes = rows.map(c => c.close);
+    const highs = rows.map(c => c.high);
+    const price = closes.at(-1)!;
+    const high52 = Math.max(...highs.slice(-252));
+    const high52Distance = +(price / high52 * 100).toFixed(1);
+    const rsiDaily = rsi(closes);
+    const macdDaily = macd(closes);
+    const isBuy = high52Distance >= 80 && high52Distance <= 98 && rsiDaily > 55 && macdDaily;
+    const score = computeScore({ rsiDaily, macdDaily, high52Distance, adx: false, supertrend: false });
+
+    return computeSwingSignal(rows, isBuy, score);
+  }, [rows]);
+
+  const srY = (price: number) => 240 - ((price - min) / (max - min || 1)) * 200;
+
   return(
-    <main className="min-h-screen bg-[#030B1A] text-white">
+    <main className="min-h-screen bg-background text-foreground">
       <div className="max-w-6xl mx-auto p-8">
 
-        <Link to="/" className="text-sky-400 text-sm">
+        <Link to="/" className="text-signal text-sm">
           ← Back to MarketCompass
         </Link>
 
-        <h1 className="text-5xl font-bold mt-4">{ticker}</h1>
-        <p className="text-slate-400 mt-2">
+        <div className="flex items-center justify-between mt-4 flex-wrap gap-3">
+          <h1 className="text-5xl font-bold ticker-value">{ticker}</h1>
+          {signal && <DirectionBadge direction={signal.direction} />}
+        </div>
+
+        <p className="text-muted-foreground mt-2">
           Educational Market Structure Explorer
         </p>
 
+        {signal && signal.direction !== "HOLD" && (
+          <div className="signal-card mt-6">
+            <div className="flex justify-between items-start mb-4">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                Educational Swing Signal
+              </div>
+              <DirectionBadge direction={signal.direction} />
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wider">Entry</div>
+                <div className="text-xl font-bold ticker-value mt-1">₹{signal.entry.toFixed(2)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wider">Stop-Loss</div>
+                <div className="text-xl font-bold ticker-value text-loss mt-1">₹{signal.stopLoss.toFixed(2)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wider">Target</div>
+                <div className="text-xl font-bold ticker-value text-profit mt-1">₹{signal.target.toFixed(2)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wider">Risk:Reward</div>
+                <div className="text-xl font-bold ticker-value mt-1">1:{signal.riskReward}</div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-border text-sm text-muted-foreground leading-6">
+              {signal.reason}
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
 
-          <div className="bg-slate-900 rounded-xl p-5">
-            <div className="text-slate-400 text-sm">Current Price</div>
-            <div className="text-3xl font-bold mt-1">₹{current.toFixed(2)}</div>
+          <div className="panel p-5">
+            <div className="text-muted-foreground text-sm">Current Price</div>
+            <div className="text-3xl font-bold ticker-value mt-1">₹{current.toFixed(2)}</div>
           </div>
 
-          <div className="bg-slate-900 rounded-xl p-5">
-            <div className="text-slate-400 text-sm">2Y High</div>
-            <div className="text-3xl font-bold mt-1">₹{high.toFixed(0)}</div>
+          <div className="panel p-5">
+            <div className="text-muted-foreground text-sm">2Y High</div>
+            <div className="text-3xl font-bold ticker-value mt-1">₹{high.toFixed(0)}</div>
           </div>
 
-          <div className="bg-slate-900 rounded-xl p-5">
-            <div className="text-slate-400 text-sm">2Y Low</div>
-            <div className="text-3xl font-bold mt-1">₹{low.toFixed(0)}</div>
+          <div className="panel p-5">
+            <div className="text-muted-foreground text-sm">2Y Low</div>
+            <div className="text-3xl font-bold ticker-value mt-1">₹{low.toFixed(0)}</div>
           </div>
 
-          <div className="bg-slate-900 rounded-xl p-5">
-            <div className="text-slate-400 text-sm">Observations</div>
-            <div className="text-3xl font-bold mt-1">{data.length}</div>
+          <div className="panel p-5">
+            <div className="text-muted-foreground text-sm">Observations</div>
+            <div className="text-3xl font-bold ticker-value mt-1">{data.length}</div>
           </div>
 
         </div>
 
-        <div className="bg-slate-900 rounded-xl p-6 mt-8">
+        <div className="panel p-6 mt-8">
 
           <div className="flex justify-between items-center mb-5">
             <h2 className="text-2xl font-bold">Price Structure</h2>
 
             <div className="flex gap-2">
-              {["D","W","M"].map(x=>(
+              {(["D","W","M"] as const).map(x=>(
                 <button
                   key={x}
-                  onClick={()=>setTf(x as any)}
+                  onClick={()=>setTf(x)}
                   className={`px-3 py-2 rounded-lg text-sm ${
                     tf===x
-                    ?"bg-sky-500 text-white"
-                    :"bg-slate-800 text-slate-300"
+                    ?"bg-primary text-primary-foreground"
+                    :"bg-secondary text-secondary-foreground"
                   }`}
                 >
                   {x==="D"?"Daily":x==="W"?"Weekly":"Monthly"}
@@ -146,29 +220,56 @@ export default function StockDetail(){
                 x2="800"
                 y1={20+i*55}
                 y2={20+i*55}
-                stroke="#22304A"
+                stroke="hsl(var(--border))"
                 strokeDasharray="4 6"
               />
             ))}
 
+            {signal && signal.support >= min && signal.support <= max && (
+              <line
+                x1="20" x2="800"
+                y1={srY(signal.support)} y2={srY(signal.support)}
+                stroke="hsl(var(--loss))"
+                strokeWidth="1.5"
+                strokeDasharray="6 4"
+              />
+            )}
+
+            {signal && signal.resistance >= min && signal.resistance <= max && (
+              <line
+                x1="20" x2="800"
+                y1={srY(signal.resistance)} y2={srY(signal.resistance)}
+                stroke="hsl(var(--profit))"
+                strokeWidth="1.5"
+                strokeDasharray="6 4"
+              />
+            )}
+
             <polyline
               fill="none"
-              stroke="#38BDF8"
+              stroke="hsl(var(--signal))"
               strokeWidth="3"
               points={points}
             />
 
-            <text x="10" y="20" fill="#94A3B8" fontSize="10">
+            <text x="10" y="20" fill="hsl(var(--muted-foreground))" fontSize="10">
               ₹{max.toFixed(0)}
             </text>
 
-            <text x="10" y="245" fill="#94A3B8" fontSize="10">
+            <text x="10" y="245" fill="hsl(var(--muted-foreground))" fontSize="10">
               ₹{min.toFixed(0)}
             </text>
 
+            {signal && (
+              <>
+                <text x="805" y={srY(signal.resistance)} fill="hsl(var(--profit))" fontSize="9">Resistance</text>
+                <text x="805" y={srY(signal.support)} fill="hsl(var(--loss))" fontSize="9">Support</text>
+              </>
+            )}
+
           </svg>
 
-          <div className="flex justify-between text-xs text-slate-500 mt-2">
+          <div className="flex justify-between text-xs text-muted-foreground mt-2">
             <span>{data[0]?.date}</span>
             <span>{data.at(-1)?.date}</span>
           </div>
@@ -177,84 +278,84 @@ export default function StockDetail(){
 
         <div className="grid md:grid-cols-2 gap-6 mt-8">
 
-          <div className="bg-slate-900 rounded-xl p-5">
-            <div className="text-cyan-400 text-xs uppercase tracking-wider mb-2">
+          <div className="panel p-5">
+            <div className="text-signal text-xs uppercase tracking-wider mb-2">
               Momentum
             </div>
 
-            <div className="text-4xl font-bold">
+            <div className="text-4xl font-bold ticker-value">
               {Math.round((current-low)/(high-low||1)*100)}
             </div>
 
-            <div className="text-slate-400 text-sm mt-2">
+            <div className="text-muted-foreground text-sm mt-2">
               Position within the 2-year range
             </div>
           </div>
 
-          <div className="bg-slate-900 rounded-xl p-5">
-            <div className="text-emerald-400 text-xs uppercase tracking-wider mb-2">
+          <div className="panel p-5">
+            <div className="text-profit text-xs uppercase tracking-wider mb-2">
               Trend Structure
             </div>
 
-            <div className={`text-5xl font-bold ${trend?"text-emerald-400":"text-red-400"}`}>
+            <div className={`text-5xl font-bold ${trend?"text-profit":"text-loss"}`}>
               {trend?"↗":"↘"}
             </div>
 
-            <div className="text-slate-300 font-medium mt-2">
+            <div className="text-foreground font-medium mt-2">
               {trend?"Bullish Structure":"Bearish Structure"}
             </div>
 
-            <p className="text-slate-400 text-sm mt-2 leading-6">
+            <p className="text-muted-foreground text-sm mt-2 leading-6">
               Compare Daily, Weekly and Monthly views before forming an educational conclusion.
             </p>
           </div>
 
         </div>
 
-        <div className="bg-slate-900 rounded-xl p-6 mt-8">
+        <div className="panel p-6 mt-8">
           <h2 className="text-2xl font-bold mb-5">
             Learning Summary
           </h2>
 
           <div className="grid md:grid-cols-3 gap-4">
 
-            <div className="rounded-xl bg-cyan-500/10 border border-cyan-500/20 p-4">
-              <div className="text-cyan-300 text-xs uppercase font-semibold mb-2">
+            <div className="rounded-xl bg-signal/10 border border-signal/20 p-4">
+              <div className="text-signal text-xs uppercase font-semibold mb-2">
                 Momentum
               </div>
               <div className="font-semibold text-lg mb-2">RSI Concept</div>
-              <p className="text-sm text-slate-300 leading-6">
+              <p className="text-sm text-muted-foreground leading-6">
                 Momentum studies how strongly price is advancing or weakening over time.
               </p>
             </div>
 
-            <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-4">
-              <div className="text-emerald-300 text-xs uppercase font-semibold mb-2">
+            <div className="rounded-xl bg-profit/10 border border-profit/20 p-4">
+              <div className="text-profit text-xs uppercase font-semibold mb-2">
                 Trend
               </div>
               <div className="font-semibold text-lg mb-2">Higher Highs</div>
-              <p className="text-sm text-slate-300 leading-6">
+              <p className="text-sm text-muted-foreground leading-6">
                 Sustainable uptrends usually develop through higher highs and higher lows.
               </p>
             </div>
 
-            <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4">
-              <div className="text-amber-300 text-xs uppercase font-semibold mb-2">
+            <div className="rounded-xl bg-warning/10 border border-warning/20 p-4">
+              <div className="text-warning text-xs uppercase font-semibold mb-2">
                 Structure
               </div>
               <div className="font-semibold text-lg mb-2">Multiple Timeframes</div>
-              <p className="text-sm text-slate-300 leading-6">
+              <p className="text-sm text-muted-foreground leading-6">
                 Compare Daily, Weekly and Monthly charts to understand market structure.
               </p>
             </div>
 
           </div>
 
-          <div className="mt-6 rounded-xl bg-slate-800/60 border border-slate-700 p-4">
-            <div className="font-semibold text-cyan-300 mb-2">
+          <div className="mt-6 rounded-xl bg-secondary/60 border border-border p-4">
+            <div className="font-semibold text-signal mb-2">
               📘 Educational Use Only
             </div>
-            <p className="text-sm text-slate-300 leading-6">
+            <p className="text-sm text-muted-foreground leading-6">
               MarketCompass is a learning platform for understanding price structure,
               momentum and trend behaviour. It does not provide investment advice,
               stock recommendations or trading signals.
