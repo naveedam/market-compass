@@ -1,10 +1,14 @@
 import { useState } from "react";
 import StockScreener from "@/components/StockScreener";
 import AddStockPanel from "@/components/search/AddStockPanel";
+import ShockersPanel from "@/components/ShockersPanel";
+import nseSymbols from "@/data/nse-symbols.json";
+import type { UniverseRow } from "@/lib/sheets";
 
 export default function Index() {
   const [shariahOnly, setShariahOnly] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const shockerUniverse = nseSymbols as UniverseRow[];
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -36,6 +40,8 @@ export default function Index() {
         <AddStockPanel onAdded={() => setRefreshKey(k => k + 1)} />
 
         <StockScreener key={refreshKey} shariahOnly={shariahOnly} />
+
+        <ShockersPanel universe={shockerUniverse} />
 
         <div className="panel p-6 mt-10">
           <h2 className="text-2xl font-semibold mb-5">
