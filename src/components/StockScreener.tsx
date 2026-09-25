@@ -121,130 +121,140 @@ export default function StockScreener({ shariahOnly = false }: Props) {
 
       </div>
 
-      <div className="panel overflow-hidden">
+      <div className="panel overflow-hidden flex flex-col" style={{ maxHeight: "70vh" }}>
 
-        <table className="w-full">
+        <div className="panel-header">
+          <span>Nifty 50 Watchlist</span>
+          <span className="text-[10px]">{visibleStocks.length} stocks · scroll for more</span>
+        </div>
 
-          <thead className="bg-secondary">
-            <tr className="text-left text-muted-foreground text-xs uppercase tracking-wider">
+        <div
+          className="flex-1 overflow-y-auto"
+          style={{ scrollbarWidth: "thin", scrollbarColor: "hsl(var(--border)) transparent" }}
+        >
+          <table className="w-full text-xs font-mono">
 
-              <th className="p-3">Company</th>
+            <thead className="sticky top-0 bg-card z-10">
+              <tr className="text-left text-muted-foreground border-b border-border">
 
-              <th title="Learning Score combines RSI, MACD, proximity to the 52-week high and trend structure into a 0–100 educational metric.">
-                Score ⓘ
-              </th>
+                <th className="px-3 py-2">Company</th>
 
-              <th>Price</th>
+                <th className="px-2 py-2" title="Learning Score combines RSI, MACD, proximity to the 52-week high and trend structure into a 0–100 educational metric.">
+                  Score ⓘ
+                </th>
 
-              <th title="Current price as a percentage of the 52-week high. Higher values indicate greater proximity to the yearly high.">
-                52W% ⓘ
-              </th>
+                <th className="px-2 py-2 text-right">Price</th>
 
-              <th title="Relative Strength Index measures momentum on a scale from 0 to 100.">
-                RSI ⓘ
-              </th>
+                <th className="px-2 py-2 text-right" title="Current price as a percentage of the 52-week high. Higher values indicate greater proximity to the yearly high.">
+                  52W% ⓘ
+                </th>
 
-              <th title="Educational interpretation of the current market structure.">
-                Status ⓘ
-              </th>
+                <th className="px-2 py-2 text-right" title="Relative Strength Index measures momentum on a scale from 0 to 100.">
+                  RSI ⓘ
+                </th>
 
-              <th title="Educational, ratio-based Shariah screen: market cap, debt/equity, debt/market cap, interest income/sales and receivables/market cap. Hover a badge for the breakdown.">
-                Shariah ⓘ
-              </th>
+                <th className="px-2 py-2" title="Educational interpretation of the current market structure.">
+                  Status ⓘ
+                </th>
 
-              <th title="Educational swing-trade read derived from the same score: direction, entry, stop-loss, target and support/resistance. Hover for the breakdown.">
-                Signal ⓘ
-              </th>
+                <th className="px-2 py-2" title="Educational, ratio-based Shariah screen: market cap, debt/equity, debt/market cap, interest income/sales and receivables/market cap. Hover a badge for the breakdown.">
+                  Shariah ⓘ
+                </th>
 
-            </tr>
-          </thead>
+                <th className="px-2 py-2" title="Educational swing-trade read derived from the same score: direction, entry, stop-loss, target and support/resistance. Hover for the breakdown.">
+                  Signal ⓘ
+                </th>
 
-          <tbody>
+              </tr>
+            </thead>
 
-            {visibleStocks.map(s => {
-              const st = status(s.score);
+            <tbody>
 
-              return (
-                <tr
-                  key={s.ticker}
-                  className="border-t border-border hover:bg-secondary/60"
-                >
+              {visibleStocks.map(s => {
+                const st = status(s.score);
 
-                  <td className="p-3">
-                    <Link
-                      to={`/stock/${encodeURIComponent(s.ticker)}`}
-                      className="font-semibold text-signal hover:brightness-125"
-                    >
-                      {s.name}
-                    </Link>
+                return (
+                  <tr
+                    key={s.ticker}
+                    className="border-b border-border/50 hover:bg-secondary/40"
+                  >
 
-                    <div className="text-xs text-muted-foreground font-mono">
-                      {s.ticker}
-                    </div>
-                  </td>
+                    <td className="px-3 py-1.5">
+                      <Link
+                        to={`/stock/${encodeURIComponent(s.ticker)}`}
+                        className="font-semibold text-signal hover:brightness-125"
+                      >
+                        {s.name}
+                      </Link>
 
-                  <td>
-                    <div className="flex items-center gap-2">
-
-                      <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-signal"
-                          style={{ width: `${s.score}%` }}
-                        />
+                      <div className="text-[10px] text-muted-foreground">
+                        {s.ticker}
                       </div>
+                    </td>
 
-                      <span className="font-semibold w-8 ticker-value">{s.score}</span>
+                    <td className="px-2 py-1.5">
+                      <div className="flex items-center gap-2">
 
-                    </div>
-                  </td>
+                        <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-signal"
+                            style={{ width: `${s.score}%` }}
+                          />
+                        </div>
 
-                  <td className="ticker-value">₹{s.price.toFixed(2)}</td>
+                        <span className="font-semibold w-6 ticker-value">{s.score}</span>
 
-                  <td className="ticker-value">{s.high52Distance.toFixed(1)}%</td>
+                      </div>
+                    </td>
 
-                  <td className="ticker-value">{s.rsiDaily.toFixed(1)}</td>
+                    <td className="px-2 py-1.5 text-right ticker-value">₹{s.price.toFixed(2)}</td>
 
-                  <td>
-                    <span
-                      title={st.tip}
-                      className={`px-2 py-1 rounded text-xs font-semibold ${st.cls}`}
-                    >
-                      {st.label}
-                    </span>
-                  </td>
+                    <td className="px-2 py-1.5 text-right ticker-value">{s.high52Distance.toFixed(1)}%</td>
 
-                  <td>
-                    <span
-                      title={shariahTooltip(s.shariah)}
-                      className={`px-2 py-1 rounded text-xs font-semibold cursor-help ${
-                        !s.shariah.dataAvailable
-                          ? "bg-warning/20 text-warning"
+                    <td className="px-2 py-1.5 text-right ticker-value">{s.rsiDaily.toFixed(1)}</td>
+
+                    <td className="px-2 py-1.5">
+                      <span
+                        title={st.tip}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${st.cls}`}
+                      >
+                        {st.label}
+                      </span>
+                    </td>
+
+                    <td className="px-2 py-1.5">
+                      <span
+                        title={shariahTooltip(s.shariah)}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-semibold cursor-help ${
+                          !s.shariah.dataAvailable
+                            ? "bg-warning/20 text-warning"
+                            : s.shariah.compliant
+                            ? "bg-profit/20 text-profit"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {!s.shariah.dataAvailable
+                          ? "Data Unavailable"
                           : s.shariah.compliant
-                          ? "bg-profit/20 text-profit"
-                          : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {!s.shariah.dataAvailable
-                        ? "Data Unavailable"
-                        : s.shariah.compliant
-                        ? "Compliant"
-                        : "Excluded"}
-                    </span>
-                  </td>
+                          ? "Compliant"
+                          : "Excluded"}
+                      </span>
+                    </td>
 
-                  <td>
-                    <span title={swingTooltip(s.swing)} className="cursor-help">
-                      <DirectionBadge direction={s.swing.direction} />
-                    </span>
-                  </td>
+                    <td className="px-2 py-1.5">
+                      <span title={swingTooltip(s.swing)} className="cursor-help">
+                        <DirectionBadge direction={s.swing.direction} />
+                      </span>
+                    </td>
 
-                </tr>
-              );
-            })}
+                  </tr>
+                );
+              })}
 
-          </tbody>
+            </tbody>
 
-        </table>
+          </table>
+        </div>
 
       </div>
 
