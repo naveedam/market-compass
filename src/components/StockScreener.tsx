@@ -37,9 +37,27 @@ function swingTooltip(s: SwingSignal): string {
   ].join("\n");
 }
 
+type SortKey = "name" | "score" | "price" | "high52Distance" | "rsiDaily";
+
+function SortIcon({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
+  if (!active) return <span className="text-muted-foreground/40 ml-1">↕</span>;
+  return <span className="text-signal ml-1">{dir === "asc" ? "↑" : "↓"}</span>;
+}
+
 export default function StockScreener({ shariahOnly = false }: Props) {
   const [stocks, setStocks] = useState<StockSignal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sortKey, setSortKey] = useState<SortKey>("score");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -95,6 +113,13 @@ export default function StockScreener({ shariahOnly = false }: Props) {
 
   const visibleStocks = stocks.filter(s => !shariahOnly || s.shariah.compliant);
 
+  const sortedStocks = [...visibleStocks].sort((a, b) => {
+    let cmp: number;
+    if (sortKey === "name") cmp = a.name.localeCompare(b.name);
+    else cmp = a[sortKey] - b[sortKey];
+    return sortDir === "asc" ? cmp : -cmp;
+  });
+
   const aligned = visibleStocks.filter(s => s.score >= 70).length;
 
   return (
@@ -137,20 +162,24 @@ export default function StockScreener({ shariahOnly = false }: Props) {
             <thead className="sticky top-0 bg-card z-10">
               <tr className="text-left text-muted-foreground border-b border-border">
 
-                <th className="px-3 py-2">Company</th>
-
-                <th className="px-2 py-2" title="Learning Score combines RSI, MACD, proximity to the 52-week high and trend structure into a 0–100 educational metric.">
-                  Score ⓘ
+                <th className="px-3 py-2 cursor-pointer select-none hover:text-foreground" onClick={() => toggleSort("name")}>
+                  Company<SortIcon active={sortKey === "name"} dir={sortDir} />
                 </th>
 
-                <th className="px-2 py-2 text-right">Price</th>
-
-                <th className="px-2 py-2 text-right" title="Current price as a percentage of the 52-week high. Higher values indicate greater proximity to the yearly high.">
-                  52W% ⓘ
+                <th className="px-2 py-2 cursor-pointer select-none hover:text-foreground" title="Learning Score combines RSI, MACD, proximity to the 52-week high and trend structure into a 0–100 educational metric." onClick={() => toggleSort("score")}>
+                  Score ⓘ<SortIcon active={sortKey === "score"} dir={sortDir} />
                 </th>
 
-                <th className="px-2 py-2 text-right" title="Relative Strength Index measures momentum on a scale from 0 to 100.">
-                  RSI ⓘ
+                <th className="px-2 py-2 text-right cursor-pointer select-none hover:text-foreground" onClick={() => toggleSort("price")}>
+                  Price<SortIcon active={sortKey === "price"} dir={sortDir} />
+                </th>
+
+                <th className="px-2 py-2 text-right cursor-pointer select-none hover:text-foreground" title="Current price as a percentage of the 52-week high. Higher values indicate greater proximity to the yearly high." onClick={() => toggleSort("high52Distance")}>
+                  52W% ⓘ<SortIcon active={sortKey === "high52Distance"} dir={sortDir} />
+                </th>
+
+                <th className="px-2 py-2 text-right cursor-pointer select-none hover:text-foreground" title="Relative Strength Index measures momentum on a scale from 0 to 100." onClick={() => toggleSort("rsiDaily")}>
+                  RSI ⓘ<SortIcon active={sortKey === "rsiDaily"} dir={sortDir} />
                 </th>
 
                 <th className="px-2 py-2" title="Educational interpretation of the current market structure.">
@@ -170,7 +199,7 @@ export default function StockScreener({ shariahOnly = false }: Props) {
 
             <tbody>
 
-              {visibleStocks.map(s => {
+              {sortedStocks.map(s => {
                 const st = status(s.score);
 
                 return (
